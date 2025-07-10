@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const dotenv = require("dotenv");
 
 dotenv.config();
@@ -10,9 +10,6 @@ const port = process.env.PORT || 5000;
 // Middleware
 app.use(cors());
 app.use(express.json());
-
-
-
 
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster1.xyujo4m.mongodb.net/?retryWrites=true&w=majority&appName=Cluster1`;
@@ -34,28 +31,77 @@ async function run() {
         const db = client.db('employeeManagement');
         const peoplesCollection = db.collection('peoples');
         const worksCollection = db.collection('works');
+        const paymentsCollection = db.collection('payments');
 
 
-        // app.get('/peoples', async (req, res) => {
-        //     const peoples = await peoplesCollection.find().toArray();
-        //     res.send(peoples);
-        // });
+        // GET employees by role
+        app.get("/peoples", async (req, res) => {
+            try {
+                const query = { role: "employee" }; // Always filter to only 'employee' role
+                const employees = await peoplesCollection.find(query).toArray();
+                res.send(employees);
+            } catch (error) {
+                console.error("Error fetching employees:", error);
+                res.status(500).send({ message: "Failed to fetch employees" });
+            }
+        });
 
+        // to check role
+        app.get('/peoples/role/:email', async (req, res) => {
+            const email = req.params.email;
+            const user = await peoplesCollection.findOne({ email });
 
+            if (!user) return res.send({ role: null });
+            res.send({ role: user.role });
+        });
+
+        // to get specific data
+        app.get("/peoples/:id", async (req, res) => {
+            const id = req.params.id;
+            const result = await peoplesCollection.findOne(
+                { _id: new ObjectId(id) }
+            );
+            res.send(result);
+        });
+
+        // PATCH toggle verification
+        app.patch("/peoples/:id", async (req, res) => {
+            const id = req.params.id;
+
+            try {
+                const user = await peoplesCollection.findOne({ _id: new ObjectId(id) });
+
+                if (!user) {
+                    return res.status(404).send({ message: "User not found" });
+                }
+
+                const result = await peoplesCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    { $set: { isVerified: !user.isVerified } }
+                );
+
+                res.send(result);
+            } catch (err) {
+                console.error("Error toggling verify:", err);
+                res.status(500).send({ message: "Internal server error" });
+            }
+        });
 
 
         // registered User post data 
         app.post('/peoples', async (req, res) => {
-            try {
-                const newPeople = req.body;
-                const result = await peoplesCollection.insertOne(newPeople);
-                res.send(result);
+            const email = req.body.email;
+            const userExists = await peoplesCollection.findOne({ email })
+            if (userExists) {
+                // update last log in
+                return res.status(200).send({ message: 'User already exists', inserted: false });
             }
-            catch (error) {
-                console.error('Error inserting People', error);
-                res.status(500).send({ message: 'Failed to create People' });
-            }
+            const user = req.body;
+            const result = await peoplesCollection.insertOne(user);
+            res.send(result);
         });
+
+
 
         // to see work entry
         app.get('/works', async (req, res) => {
@@ -82,6 +128,13 @@ async function run() {
             }
         });
 
+        // to get specific work info by id
+        app.get('/works/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = await worksCollection.findOne({ _id: new ObjectId(id) });
+            res.send(query);
+        });
+
         // ✅ PATCH to update a work item
         app.patch('/works/:id', async (req, res) => {
             try {
@@ -106,6 +159,14 @@ async function run() {
             } catch (err) {
                 res.status(500).send({ error: 'Failed to delete work' });
             }
+        });
+
+        // POST create payment
+        app.post("/payments", async (req, res) => {
+            const payment = req.body;
+            payment.createdAt = new Date();
+            const result = await paymentsCollection.insertOne(payment);
+            res.send(result);
         });
 
 
