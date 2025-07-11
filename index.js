@@ -78,6 +78,26 @@ async function run() {
             }
         });
 
+        // get verified employee's and HR's
+        app.get("/peoples/verified", async (req, res) => {
+            try {
+                const verifiedUsers = await peoplesCollection
+                    .find({
+                        isVerified: true,
+                        role: { $ne: "admin" }, // Exclude admin
+                    })
+                    .toArray();
+
+                res.send(verifiedUsers);
+            } catch (error) {
+                console.error("Error fetching verified employees:", error);
+                res.status(500).send({ message: "Internal Server Error" });
+            }
+        });
+
+
+
+
         // to check role
         app.get('/peoples/role/:email', verifyFBToken, async (req, res) => {
             try {
@@ -123,9 +143,58 @@ async function run() {
             }
         });
 
+        // patch specific employee's fire's status
+        app.patch("/peoples/fire/:id", async (req, res) => {
+            const id = req.params.id;
+            const result = await peoplesCollection.updateOne(
+                { _id: new ObjectId(id) },
+                { $set: { isFired: true } }
+            );
+            res.send(result);
+        });
+
+        // to promote employee's
+        app.patch("/peoples/promote/:id", async (req, res) => {
+            const id = req.params.id;
+            const result = await peoplesCollection.updateOne(
+                { _id: new ObjectId(id) },
+                { $set: { role: "hr" } }
+            );
+            res.send(result);
+        });
+
+        // to increase salary
+        app.patch("/peoples/salary/:id", async (req, res) => {
+            const id = req.params.id;
+            const { salary } = req.body;
+
+            try {
+                const user = await peoplesCollection.findOne({ _id: new ObjectId(id) });
+
+                if (!user) {
+                    return res.status(404).send({ message: "User not found" });
+                }
+
+                if (typeof salary !== "number" || salary <= user.salary) {
+                    return res.status(400).send({
+                        message: "New salary must be greater than the current salary",
+                    });
+                }
+
+                const result = await peoplesCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    { $set: { salary } }
+                );
+
+                res.send(result);
+            } catch (err) {
+                console.error("Failed to update salary:", err);
+                res.status(500).send({ message: "Server Error" });
+            }
+        });
 
         // registered User post data 
-        app.post('/peoples', verifyFBToken, async (req, res) => {
+        app.post('/peoples', async (req, res) => {
             const email = req.body.email;
             const userExists = await peoplesCollection.findOne({ email })
             if (userExists) {
@@ -198,10 +267,9 @@ async function run() {
         });
 
         // POST create payment
-        app.post("/payments", verifyFBToken, async (req, res) => {
-            const payment = req.body;
-            payment.createdAt = new Date();
-            const result = await paymentsCollection.insertOne(payment);
+        app.post("/payment", async (req, res) => {
+            const data = req.body;
+            const result = await paymentsCollection.insertOne(data);
             res.send(result);
         });
 
