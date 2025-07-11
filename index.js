@@ -8,6 +8,9 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 5000;
 
+const stripe = require('stripe')(process.env.PAYMENT_GATEWAY_KEY);
+console.log("Stripe key:", process.env.STRIPE_SECRET_KEY);
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -266,11 +269,59 @@ async function run() {
             }
         });
 
+        // get all the payment data
+        app.get("/payment-requests", async (req, res) => {
+            const result = await paymentsCollection.find().toArray();
+            res.send(result);
+        });
+
+        // get specific employee pending payment data
+        app.get('/payment/:id', async (req, res) => {
+            const id = req.params.id;
+            const result = await paymentsCollection.findOne({ _id: new ObjectId(id) });
+            res.send(result);
+        })
+
+        // mark requested as paid
+        app.patch("/payment-requests/:id/pay", async (req, res) => {
+            const id = req.params.id;
+            const { transactionId } = req.body;
+
+            const result = await paymentsCollection.updateOne(
+                { _id: new ObjectId(id) },
+                {
+                    $set: {
+                        status: "paid",
+                        transactionId,
+                        paymentDate: new Date(),
+                    },
+                }
+            );
+
+            res.send(result);
+        });
+
         // POST create payment
         app.post("/payment", async (req, res) => {
             const data = req.body;
             const result = await paymentsCollection.insertOne(data);
             res.send(result);
+        });
+
+
+        app.post('/create-payment-intent', async (req, res) => {
+            const amountInCents = req.body.amountInCents
+            try {
+                const paymentIntent = await stripe.paymentIntents.create({
+                    amount: amountInCents, // Amount in cents
+                    currency: 'usd',
+                    payment_method_types: ['card'],
+                });
+
+                res.json({ clientSecret: paymentIntent.client_secret });
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
         });
 
 
