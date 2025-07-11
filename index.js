@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const admin = require("firebase-admin");
 const dotenv = require("dotenv");
 
 dotenv.config();
@@ -10,6 +11,15 @@ const port = process.env.PORT || 5000;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+
+
+const serviceAccount = require("./firebase-service-key.json");
+
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+});
+
 
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster1.xyujo4m.mongodb.net/?retryWrites=true&w=majority&appName=Cluster1`;
@@ -33,9 +43,31 @@ async function run() {
         const worksCollection = db.collection('works');
         const paymentsCollection = db.collection('payments');
 
+        // custom middlewares
+        const verifyFBToken = async (req, res, next) => {
+            const authHeaders = req.headers.authorization;
+            if (!authHeaders) {
+                return res.status(401).send({ message: 'Unauthorized access' })
+            }
+            const token = authHeaders.split(' ')[1];
+            if (!token) {
+                return res.status(401).send({ message: 'Unauthorized access' })
+            }
+
+            // verify the token
+            try {
+                const decoded = await admin.auth().verifyIdToken(token);
+                req.decoded = decoded;
+                next();
+            }
+            catch (error) {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+        };
+
 
         // GET employees by role
-        app.get("/peoples", async (req, res) => {
+        app.get("/peoples", verifyFBToken, async (req, res) => {
             try {
                 const query = { role: "employee" }; // Always filter to only 'employee' role
                 const employees = await peoplesCollection.find(query).toArray();
@@ -47,16 +79,20 @@ async function run() {
         });
 
         // to check role
-        app.get('/peoples/role/:email', async (req, res) => {
-            const email = req.params.email;
-            const user = await peoplesCollection.findOne({ email });
+        app.get('/peoples/role/:email', verifyFBToken, async (req, res) => {
+            try {
+                const email = req.params.email;
+                const user = await peoplesCollection.findOne({ email });
 
-            if (!user) return res.send({ role: null });
-            res.send({ role: user.role });
+                if (!user) return res.send({ role: null });
+                res.send({ role: user.role });
+            } catch (error) {
+                res.status(500).send({ error: "Failed to fetch role" });
+            }
         });
 
         // to get specific data
-        app.get("/peoples/:id", async (req, res) => {
+        app.get("/peoples/:id", verifyFBToken, async (req, res) => {
             const id = req.params.id;
             const result = await peoplesCollection.findOne(
                 { _id: new ObjectId(id) }
@@ -89,7 +125,7 @@ async function run() {
 
 
         // registered User post data 
-        app.post('/peoples', async (req, res) => {
+        app.post('/peoples', verifyFBToken, async (req, res) => {
             const email = req.body.email;
             const userExists = await peoplesCollection.findOne({ email })
             if (userExists) {
@@ -104,7 +140,7 @@ async function run() {
 
 
         // to see work entry
-        app.get('/works', async (req, res) => {
+        app.get('/works', verifyFBToken, async (req, res) => {
             try {
                 const email = req.query.email;
                 const query = email ? { email } : {};
@@ -129,7 +165,7 @@ async function run() {
         });
 
         // to get specific work info by id
-        app.get('/works/:id', async (req, res) => {
+        app.get('/works/:id', verifyFBToken, async (req, res) => {
             const id = req.params.id;
             const query = await worksCollection.findOne({ _id: new ObjectId(id) });
             res.send(query);
@@ -162,7 +198,7 @@ async function run() {
         });
 
         // POST create payment
-        app.post("/payments", async (req, res) => {
+        app.post("/payments", verifyFBToken, async (req, res) => {
             const payment = req.body;
             payment.createdAt = new Date();
             const result = await paymentsCollection.insertOne(payment);
