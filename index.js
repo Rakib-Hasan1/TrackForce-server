@@ -45,6 +45,7 @@ async function run() {
         const peoplesCollection = db.collection('peoples');
         const worksCollection = db.collection('works');
         const paymentsCollection = db.collection('payments');
+        const reviewsCollection = db.collection("reviews");
 
         // custom middlewares
         const verifyFBToken = async (req, res, next) => {
@@ -68,6 +69,16 @@ async function run() {
             }
         };
 
+        // get reviews
+
+
+        // post reviews to db
+        app.post('/reviews', async (req, res) => {
+            const data = req.body;
+            const result = await reviewsCollection.insertOne(data);
+            res.send(result);
+        });
+
 
         // GET employees by role
         app.get("/peoples", verifyFBToken, async (req, res) => {
@@ -82,7 +93,7 @@ async function run() {
         });
 
         // get verified employee's and HR's
-        app.get("/peoples/verified", async (req, res) => {
+        app.get("/peoples/verified", verifyFBToken, async (req, res) => {
             try {
                 const verifiedUsers = await peoplesCollection
                     .find({
@@ -124,7 +135,7 @@ async function run() {
         });
 
         // PATCH toggle verification
-        app.patch("/peoples/:id", async (req, res) => {
+        app.patch("/peoples/:id", verifyFBToken, async (req, res) => {
             const id = req.params.id;
 
             try {
@@ -147,7 +158,7 @@ async function run() {
         });
 
         // patch specific employee's fire's status
-        app.patch("/peoples/fire/:id", async (req, res) => {
+        app.patch("/peoples/fire/:id", verifyFBToken, async (req, res) => {
             const id = req.params.id;
             const result = await peoplesCollection.updateOne(
                 { _id: new ObjectId(id) },
@@ -157,7 +168,7 @@ async function run() {
         });
 
         // to promote employee's
-        app.patch("/peoples/promote/:id", async (req, res) => {
+        app.patch("/peoples/promote/:id", verifyFBToken, async (req, res) => {
             const id = req.params.id;
             const result = await peoplesCollection.updateOne(
                 { _id: new ObjectId(id) },
@@ -167,7 +178,7 @@ async function run() {
         });
 
         // to increase salary
-        app.patch("/peoples/salary/:id", async (req, res) => {
+        app.patch("/peoples/salary/:id", verifyFBToken, async (req, res) => {
             const id = req.params.id;
             const { salary } = req.body;
 
@@ -225,7 +236,7 @@ async function run() {
 
 
         //  POST a new work entry
-        app.post('/works', async (req, res) => {
+        app.post('/works', verifyFBToken, async (req, res) => {
             try {
                 const work = req.body;
                 work.createdAt = new Date();
@@ -259,7 +270,7 @@ async function run() {
         });
 
         // ✅ DELETE a work item
-        app.delete('/works/:id', async (req, res) => {
+        app.delete('/works/:id', verifyFBToken, async (req, res) => {
             try {
                 const id = req.params.id;
                 const result = await worksCollection.deleteOne({ _id: new ObjectId(id) });
@@ -270,20 +281,41 @@ async function run() {
         });
 
         // get all the payment data
-        app.get("/payment-requests", async (req, res) => {
+        app.get("/payment-requests", verifyFBToken, async (req, res) => {
             const result = await paymentsCollection.find().toArray();
             res.send(result);
         });
 
         // get specific employee pending payment data
-        app.get('/payment/:id', async (req, res) => {
+        app.get('/payment/:id', verifyFBToken, async (req, res) => {
             const id = req.params.id;
             const result = await paymentsCollection.findOne({ _id: new ObjectId(id) });
             res.send(result);
-        })
+        });
+
+
+
+
+        // get payment history employee role
+        app.get("/payment-history", verifyFBToken, async (req, res) => {
+            try {
+                const email = req.query.email;
+
+                if (!email) {
+                    return res.status(400).send({ message: "Email is required" });
+                }
+
+                const filter = { email }; // <-- this filters MongoDB by field 'email'
+
+                const result = await paymentsCollection.find(filter).toArray();
+                res.send(result);
+            } catch (error) {
+                res.status(500).send({ message: "Failed to fetch data", error });
+            }
+        });
 
         // mark requested as paid
-        app.patch("/payment-requests/:id/pay", async (req, res) => {
+        app.patch("/payment-requests/:id/pay", verifyFBToken, async (req, res) => {
             const id = req.params.id;
             const { transactionId } = req.body;
 
@@ -302,7 +334,7 @@ async function run() {
         });
 
         // POST create payment
-        app.post("/payment", async (req, res) => {
+        app.post("/payment", verifyFBToken, async (req, res) => {
             const data = req.body;
             const result = await paymentsCollection.insertOne(data);
             res.send(result);
