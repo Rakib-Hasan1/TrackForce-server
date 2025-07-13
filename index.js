@@ -3,6 +3,7 @@ const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const admin = require("firebase-admin");
 const dotenv = require("dotenv");
+// const moment = require("moment");
 
 dotenv.config();
 const app = express();
@@ -240,6 +241,41 @@ async function run() {
             } catch (err) {
                 res.status(500).send({ error: 'Failed to fetch works' });
             }
+        });
+
+        // get each employee's work by months
+        app.get("/progress", async (req, res) => {
+            const { month, email } = req.query;
+
+            let filter = {};
+
+            if (email) {
+                filter.email = email;
+            }
+
+            // Get all matching records based on email (if any)
+            const allWorks = await worksCollection.find(filter).toArray();
+
+            // Convert month to number for comparison (e.g., "07" => 7)
+            const selectedMonth = month ? parseInt(month) : null;
+
+            // Final filtered records by month
+            const filtered = allWorks.filter((item) => {
+                if (!item.date) return false;
+
+                const workDate = new Date(item.date); // parse ISO string
+                const workMonth = workDate.getMonth() + 1; // Jan = 0, so add 1
+
+                // If month is selected, match it
+                if (selectedMonth) {
+                    return workMonth === selectedMonth;
+                }
+
+                // If no month filter, allow all
+                return true;
+            });
+
+            res.send(filtered);
         });
 
 
