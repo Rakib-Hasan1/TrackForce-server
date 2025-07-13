@@ -3,7 +3,7 @@ const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const admin = require("firebase-admin");
 const dotenv = require("dotenv");
-// const moment = require("moment");
+
 
 dotenv.config();
 const app = express();
@@ -253,7 +253,6 @@ async function run() {
                 filter.email = email;
             }
 
-            // Get all matching records based on email (if any)
             const allWorks = await worksCollection.find(filter).toArray();
 
             // Convert month to number for comparison (e.g., "07" => 7)
@@ -385,20 +384,51 @@ async function run() {
         });
 
 
-        app.post('/create-payment-intent', async (req, res) => {
-            const amountInCents = req.body.amountInCents
+        app.post("/create-payment-intent", async (req, res) => {
+            const { amountInCents, id } = req.body;
+
             try {
+                // 1. Get the original payment request by ID
+                const paymentReq = await paymentsCollection.findOne({
+                    _id: new ObjectId(id),
+                });
+
+                if (!paymentReq) {
+                    return res.status(404).json({ error: "Payment request not found" });
+                }
+
+                const employeeId = paymentReq.employeeId;
+                const month = paymentReq.month;
+                const year = paymentReq.year;
+
+                // 2. Check if this employee is already paid for the same month/year
+                const alreadyPaid = await paymentsCollection.findOne({
+                    employeeId,
+                    month,
+                    year,
+                    status: "paid",
+                });
+
+                if (alreadyPaid) {
+                    return res
+                        .status(400)
+                        .json({ error: "This employee is already paid for this month." });
+                }
+
+                // 3. Proceed with Stripe
                 const paymentIntent = await stripe.paymentIntents.create({
-                    amount: amountInCents, // Amount in cents
-                    currency: 'usd',
-                    payment_method_types: ['card'],
+                    amount: amountInCents,
+                    currency: "usd",
+                    payment_method_types: ["card"],
                 });
 
                 res.json({ clientSecret: paymentIntent.client_secret });
             } catch (error) {
+                console.error("Payment Intent Error:", error);
                 res.status(500).json({ error: error.message });
             }
         });
+
 
 
 
