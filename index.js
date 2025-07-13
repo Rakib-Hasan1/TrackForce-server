@@ -125,13 +125,22 @@ async function run() {
             }
         });
 
-        // to get specific data
-        app.get("/peoples/:id", verifyFBToken, async (req, res) => {
-            const id = req.params.id;
-            const result = await peoplesCollection.findOne(
-                { _id: new ObjectId(id) }
-            );
-            res.send(result);
+        // GET /peoples/:id — Return employee info and salary history
+        app.get("/peoples/:id", async (req, res) => {
+            const employeeId = req.params.id;
+
+            // Get employee info
+            const employee = await peoplesCollection.findOne({ _id: new ObjectId(employeeId) });
+
+            if (!employee) return res.status(404).send({ message: "Employee not found" });
+
+            // Get all salary payments for this employee
+            const payments = await paymentsCollection
+                .find({ employeeId }) // employeeId stored as string
+                .sort({ year: 1, month: 1 })
+                .toArray();
+
+            res.send({ ...employee, salaryHistory: payments });
         });
 
         // PATCH toggle verification
@@ -212,7 +221,6 @@ async function run() {
             const email = req.body.email;
             const userExists = await peoplesCollection.findOne({ email })
             if (userExists) {
-                // update last log in
                 return res.status(200).send({ message: 'User already exists', inserted: false });
             }
             const user = req.body;
