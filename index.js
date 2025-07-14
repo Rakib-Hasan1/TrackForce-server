@@ -71,6 +71,10 @@ async function run() {
         };
 
         // get reviews
+        app.get('/messages', async (req, res) => {
+            const result = await reviewsCollection.find().toArray();
+            res.send(result);
+        });
 
 
         // post reviews to db
@@ -87,6 +91,24 @@ async function run() {
                 const query = { role: "employee" }; // Always filter to only 'employee' role
                 const employees = await peoplesCollection.find(query).toArray();
                 res.send(employees);
+            } catch (error) {
+                console.error("Error fetching employees:", error);
+                res.status(500).send({ message: "Failed to fetch employees" });
+            }
+        });
+
+        app.get('/all-employees', verifyFBToken, async (req, res) => {
+            try {
+                const filter = {
+                    role: { $ne: "admin" },
+                    isVerified: true,
+                    $or: [
+                        { isFired: { $exists: false } }, // no isFired field (not fired)
+                        { isFired: false }               // isFired explicitly false (not fired)
+                    ]
+                };
+                const result = await peoplesCollection.find(filter).toArray();
+                res.send(result);
             } catch (error) {
                 console.error("Error fetching employees:", error);
                 res.status(500).send({ message: "Failed to fetch employees" });
@@ -354,6 +376,12 @@ async function run() {
             } catch (error) {
                 res.status(500).send({ message: "Failed to fetch data", error });
             }
+        });
+
+        app.get('/payments-history', verifyFBToken, async (req, res) => {
+            const filter = { status: "paid" };
+            const result = await paymentsCollection.find(filter).toArray();
+            res.send(result);
         });
 
         // mark requested as paid
