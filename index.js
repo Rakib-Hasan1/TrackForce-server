@@ -137,7 +137,7 @@ async function run() {
 
             // Get all salary payments for this employee
             const payments = await paymentsCollection
-                .find({ employeeId }) // employeeId stored as string
+                .find({ employeeId })
                 .sort({ year: 1, month: 1 })
                 .toArray();
 
@@ -255,7 +255,6 @@ async function run() {
 
             const allWorks = await worksCollection.find(filter).toArray();
 
-            // Convert month to number for comparison (e.g., "07" => 7)
             const selectedMonth = month ? parseInt(month) : null;
 
             // Final filtered records by month
@@ -312,7 +311,7 @@ async function run() {
             }
         });
 
-        // ✅ DELETE a work item
+        // DELETE a work item
         app.delete('/works/:id', verifyFBToken, async (req, res) => {
             try {
                 const id = req.params.id;
@@ -384,6 +383,7 @@ async function run() {
         });
 
 
+        // payment gateway using stripe
         app.post("/create-payment-intent", async (req, res) => {
             const { amountInCents, id } = req.body;
 
