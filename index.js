@@ -47,6 +47,7 @@ async function run() {
         const worksCollection = db.collection('works');
         const paymentsCollection = db.collection('payments');
         const reviewsCollection = db.collection("reviews");
+        const ratingCollection = db.collection('rating');
 
         // custom middlewares
         const verifyFBToken = async (req, res, next) => {
@@ -81,6 +82,12 @@ async function run() {
         app.post('/reviews', async (req, res) => {
             const data = req.body;
             const result = await reviewsCollection.insertOne(data);
+            res.send(result);
+        });
+
+        // get ratings
+        app.get('/rating', async (req, res) => {
+            const result = await ratingCollection.find().toArray();
             res.send(result);
         });
 
