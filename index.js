@@ -266,7 +266,7 @@ async function run() {
         });
 
         // GET /works/summary
-        app.get("/works/summary", async (req, res) => {
+        app.get("/works/summary", verifyFBToken, async (req, res) => {
             try {
                 const summary = await worksCollection.aggregate([
                     {
@@ -293,7 +293,7 @@ async function run() {
 
 
         // get each employee's work by months
-        app.get("/progress", async (req, res) => {
+        app.get("/progress", verifyFBToken, async (req, res) => {
             const { month, email } = req.query;
 
             let filter = {};
@@ -346,7 +346,7 @@ async function run() {
         });
 
         // ✅ PATCH to update a work item
-        app.patch('/works/:id', async (req, res) => {
+        app.patch('/works/:id', verifyFBToken, async (req, res) => {
             try {
                 const id = req.params.id;
                 const update = req.body;
