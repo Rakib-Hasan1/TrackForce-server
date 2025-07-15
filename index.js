@@ -265,6 +265,33 @@ async function run() {
             }
         });
 
+        // GET /works/summary
+        app.get("/works/summary", async (req, res) => {
+            try {
+                const summary = await worksCollection.aggregate([
+                    {
+                        $group: {
+                            _id: "$email", // Group by email
+                            totalHours: { $sum: "$hours" },
+                        },
+                    },
+                    {
+                        $project: {
+                            email: "$_id",
+                            totalHours: 1,
+                            _id: 0,
+                        },
+                    },
+                ]).toArray();
+
+                res.json(summary);
+            } catch (error) {
+                console.error("Error in /works/summary:", error);
+                res.status(500).json({ error: "Failed to fetch summary." });
+            }
+        });
+
+
         // get each employee's work by months
         app.get("/progress", async (req, res) => {
             const { month, email } = req.query;
