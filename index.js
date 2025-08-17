@@ -91,6 +91,14 @@ async function run() {
             res.send(result);
         });
 
+        // get employee info
+
+        app.get("/employee/:email", async (req, res) => {
+            const email = req.params.email;
+            const query = await peoplesCollection.findOne({email});
+            res.send(query);
+        })
+
 
         // GET employees by role
         app.get("/peoples", verifyFBToken, async (req, res) => {
